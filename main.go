@@ -28,6 +28,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/fs"
 	"os"
@@ -116,6 +117,54 @@ func FindFiles(fsd fs.FS, path string, ext []string) ([]string, error) {
 		})
 	if err != nil {
 		return result, err
+	}
+	return result, nil
+}
+
+// CommentSimbols определяет символы комментариев для формата файла. Определяет
+// символ для одно строчного комментария и открывающий и закрывающий символ для
+// много строчного комментария.
+type CommentSimbols struct {
+	one_line         string
+	multi_line_open  string
+	multi_line_close string
+}
+
+// CommentLine сопоставляет номер строки в файле, содержанию комментария
+type CommentLine struct {
+	line int
+	data string
+}
+
+// FindComments функции предаётся строка с путём к файлу и интерфейс для
+// определения строки комментария, возвращается список комментариев с указанием
+// номера строки от начала файла или ошибку файловой системы.
+func FindComments(fsd fs.FS, file string, cs CommentSimbols) ([]CommentLine, error) {
+	result := make([]CommentLine, 0)
+	reader, err := fsd.Open(file)
+	if err != nil {
+		return result, nil
+	}
+	scanner := bufio.NewScanner(reader)
+	mlc := false
+	idx := 0
+	line := 1
+	for scanner.Scan() {
+		switch {
+		case strings.Contains(scanner.Text(), cs.multi_line_open):
+			idx = strings.Index(scanner.Text(), cs.multi_line_open) + len(cs.multi_line_open)
+			mlc = true
+		case strings.Contains(scanner.Text(), cs.multi_line_close):
+			mlc = false
+		case strings.Contains(scanner.Text(), cs.one_line):
+			idx = strings.Index(scanner.Text(), cs.one_line) + len(cs.one_line)
+		}
+
+		if mlc || strings.Contains(scanner.Text(), cs.one_line) {
+			result = append(result, CommentLine{line, scanner.Text()[idx:]})
+		}
+		line++
+		idx = 0
 	}
 	return result, nil
 }
