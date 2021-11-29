@@ -151,3 +151,44 @@ func Test_Comments(t *testing.T) {
 		}
 	}
 }
+
+// Test_FileTodolist тестируем функцию поиска в строках комментариев паттерна
+// «TODO:» Функция возвращает список строк комментариев в соответствии с
+// «следующие за этим символы до конца строки и все последующие строки
+// комментариев до пустой строки комментария или до окончания блока
+// последовательных строк комментариев прерываемых строками кода,
+// рассматривается как содержание» и ссылку на строку где был найден паттерн,
+// состоящую из пути к файлу и номера строки в файле.
+//
+// Функции передаются список комментариев CommentLine, строку содержащею путь к
+// файлу и строка паттерна, возвращает список структур вида [список строк
+// комментариев][ссылка в описанном формате]
+func Test_FileTodolist(t *testing.T) {
+	header := "список todo"
+	data := []CommentLine{
+		{line: 1, data: " TODO: in hello"},
+		{line: 2, data: " Line two"},
+		{line: 3, data: " Line three"},
+		// пропуск одной строки, следующая строк не должна войти в todo
+		{line: 5, data: " Line four"},
+		{line: 6, data: " Line five"},
+		{line: 7, data: ""}}
+
+	got := FindTodos("testdata/hello/main_hello.go", data, "TODO:")
+	want := []Todos{{[]string{" in hello", " Line two", " Line three"},
+		"testdata/hello/main_hello.go:1"}}
+
+	if guardLenght(t, header, len(want), len(got)) {
+		t.Fatal(got)
+	}
+	for i := 0; i < len(got); i++ {
+		if guardLenght(t, header, len(want[i].lines), len(got[i].lines)) {
+			t.Fatal(got[i].lines)
+		}
+		compareStrings(t, header, want[i].lines, got[i].lines)
+		if got[i].position != want[i].position {
+			t.Errorf("%s не равны: требуется: %v, имеется: %v",
+				header, want[i], got[i])
+		}
+	}
+}

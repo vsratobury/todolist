@@ -33,6 +33,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -125,15 +126,15 @@ func FindFiles(fsd fs.FS, path string, ext []string) ([]string, error) {
 // символ для одно строчного комментария и открывающий и закрывающий символ для
 // много строчного комментария.
 type CommentSimbols struct {
-	one_line         string
-	multi_line_open  string
-	multi_line_close string
+	one_line         string // символ для одно строчного комментария
+	multi_line_open  string // символ для начала много строчного комментария
+	multi_line_close string // символ для конца много строчного комментария
 }
 
 // CommentLine сопоставляет номер строки в файле, содержанию комментария
 type CommentLine struct {
-	line int
-	data string
+	line int    // номер строки
+	data string // содержание строки комментария
 }
 
 // FindComments функции предаётся строка с путём к файлу и интерфейс для
@@ -169,6 +170,52 @@ func FindComments(fsd fs.FS, file string, cs CommentSimbols) ([]CommentLine, err
 	return result, nil
 }
 
+// Todos определяет блок комментариев и его позиция в файле
+type Todos struct {
+	lines    []string // строки комментариев в блоке
+	position string   // ссылка на блок комментария в формате [file path]:[line]
+}
+
+func NewTodos() Todos {
+	return Todos{make([]string, 0), ""}
+}
+
+// Функции передаются: путь к файлу, список комментариев CommentLine, строку
+// содержащею путь к файлу и строка паттерна, возвращает список структур вида
+// [список строк комментариев][ссылка в описанном формате]
+func FindTodos(path string, comments []CommentLine, token string) []Todos {
+	result := make([]Todos, 0)
+	nextLine := false
+	prevLine := 0
+	currentIdx := 0
+	for i := range comments {
+		if idx := strings.Index(comments[i].data, token); idx > 0 {
+			idx += len(token)
+			td := NewTodos()
+			td.lines = append(td.lines, comments[i].data[idx:])
+			td.position = path + ":" + strconv.Itoa(comments[i].line)
+			result = append(result, td)
+			currentIdx = len(result) - 1
+			nextLine = true
+			prevLine = comments[i].line
+			continue
+		}
+		if nextLine && prevLine+1 != comments[i].line {
+			nextLine = false
+			continue
+		}
+		if nextLine && len(comments[i].data) > 0 {
+			result[currentIdx].lines = append(result[currentIdx].lines,
+				comments[i].data)
+			prevLine = comments[i].line
+		}
+		if len(comments[i].data) == 0 {
+			nextLine = false
+		}
+	}
+	return result
+}
+
 func main() {
 	fsd := os.DirFS("/")
 	dir := ""
@@ -189,10 +236,17 @@ func main() {
 		fileslist[prjlist[i]] = list
 	}
 
-	for k, v := range fileslist {
-		fmt.Println(k)
-		for i := range v {
-			fmt.Println(v[i])
+	for _, v := range fileslist {
+		for f := range v {
+			comments, err := FindComments(fsd, v[f], CommentSimbols{"//", "/*", "*/"})
+			if err != nil {
+				fmt.Println(err)
+			}
+			todos := FindTodos(v[f], comments, "TODO:")
+			for i := range todos {
+				str := strings.Join(todos[i].lines, "\n")
+				fmt.Println("* TODO ", str, "\n", "/"+todos[i].position)
+			}
 		}
 	}
 }
