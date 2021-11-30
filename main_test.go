@@ -192,3 +192,21 @@ func Test_FileTodolist(t *testing.T) {
 		}
 	}
 }
+
+// Test_Format тестируем функцию форматирования Todos. Функция возвращает
+// содержимое структуры как строку вида: «* TODO [строки данных][позиция]».
+//
+// Тестируем сравнивая с тестовой строкой.
+func Test_Format(t *testing.T) {
+	data := Todos{lines: []string{"line first", "line second"},
+		position: "testdata/hello/main_hello.go:1"}
+	want := `* TODO line first
+line second
+testdata/hello/main_hello.go:1`
+	got := data.String()
+
+	if want != got {
+		t.Errorf("форматирование: строки не равны: требуется %s, имеется %s",
+			want, got)
+	}
+}
