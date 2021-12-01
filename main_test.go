@@ -136,9 +136,14 @@ func Test_Comments(t *testing.T) {
 	}
 
 	want := []CommentLine{
-		{line: 1, data: " TODO: in hello"},
-		{line: 2, data: " Line two"},
-		{line: 3, data: ""}}
+		{line: 1, data: ""},
+		{line: 2, data: " TODO: in hello"},
+		{line: 3, data: " Line two"},
+		{line: 4, data: ""},
+		{line: 6, data: " in func line"},
+		{line: 9, data: ""},
+		{line: 10, data: "* Line three"},
+		{line: 11, data: "* Line four"}}
 
 	if guardLenght(t, header, len(want), len(got)) {
 		t.Fatal(got)
@@ -174,9 +179,9 @@ func Test_FileTodolist(t *testing.T) {
 		{line: 6, data: " Line five"},
 		{line: 7, data: ""}}
 
-	got := FindTodos("testdata/hello/main_hello.go", data, "TODO:")
+	got := FindTodos("testdata/hello/virtual.go", data, "TODO:")
 	want := []Todos{{[]string{" in hello", " Line two", " Line three"},
-		"testdata/hello/main_hello.go:1"}}
+		"testdata/hello/virtual.go:1"}}
 
 	if guardLenght(t, header, len(want), len(got)) {
 		t.Fatal(got)
@@ -199,10 +204,10 @@ func Test_FileTodolist(t *testing.T) {
 // Тестируем сравнивая с тестовой строкой.
 func Test_Format(t *testing.T) {
 	data := Todos{lines: []string{"line first", "line second"},
-		position: "testdata/hello/main_hello.go:1"}
+		position: "testdata/hello/virtual.go:1"}
 	want := `* TODO line first
 line second
-testdata/hello/main_hello.go:1`
+testdata/hello/virtual.go:1`
 	got := data.String()
 
 	if want != got {
