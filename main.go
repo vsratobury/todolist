@@ -148,26 +148,47 @@ func FindComments(fsd fs.FS, file string, cs CommentSimbols) ([]CommentLine, err
 	}
 	scanner := bufio.NewScanner(reader)
 	mlc := false
-	idx := 0
 	line := 1
 	for scanner.Scan() {
-		switch {
-		case strings.Contains(scanner.Text(), cs.multiLineOpen):
-			idx = strings.Index(scanner.Text(), cs.multiLineOpen) + len(cs.multiLineOpen)
+		comment := ""
+		if ok, str := getStringAfter(scanner.Text(), cs.multiLineOpen); ok {
+			comment = str
 			mlc = true
-		case strings.Contains(scanner.Text(), cs.multiLineClose):
-			mlc = false
-		case strings.Contains(scanner.Text(), cs.oneLine):
-			idx = strings.Index(scanner.Text(), cs.oneLine) + len(cs.oneLine)
 		}
-
-		if mlc || strings.Contains(scanner.Text(), cs.oneLine) {
-			result = append(result, CommentLine{line, scanner.Text()[idx:]})
+		if ok, str := getStringBefore(scanner.Text(), cs.multiLineClose); ok {
+			comment = str
+			mlc = false
+		}
+		if ok, str := getStringAfter(scanner.Text(), cs.oneLine); ok {
+			comment = str
+		}
+		if mlc {
+			comment = scanner.Text()
+		}
+		if len(comment) > 0 {
+			result = append(result, CommentLine{line, comment})
 		}
 		line++
-		idx = 0
 	}
 	return result, nil
+}
+
+// getStringAfter возвращает все что после найденного паттерна
+func getStringAfter(str string, tok string) (bool, string) {
+	idx := strings.Index(str, tok)
+	if idx > -1 {
+		return true, str[idx+len(tok):]
+	}
+	return false, str
+}
+
+// getStringBefore возвращает все что перед найденным паттерном
+func getStringBefore(str string, tok string) (bool, string) {
+	idx := strings.Index(str, tok)
+	if idx > -1 {
+		return true, str[:idx-len(tok)+1]
+	}
+	return false, str
 }
 
 // Todos определяет блок комментариев и его позиция в файле
@@ -177,8 +198,15 @@ type Todos struct {
 }
 
 // NewTodos возвращает пустой экземпляр структуры Todos
-func NewTodos() Todos {
-	return Todos{make([]string, 0), ""}
+func NewTodos(line string, pos string) Todos {
+	td := Todos{make([]string, 0), pos}
+	td.AppendLine(line)
+	return td
+}
+
+// AppendLine добавляет строку к блоку
+func (td *Todos) AppendLine(line string) {
+	td.lines = append(td.lines, line)
 }
 
 // String форматирует данные структуры в строку. Реализует интерфейс Stringer.
@@ -191,32 +219,26 @@ func (td Todos) String() string {
 // вида [список строк комментариев][ссылка в описанном формате]
 func FindTodos(path string, comments []CommentLine, token string) []Todos {
 	result := make([]Todos, 0)
-	nextLine := false
-	prevLine := 0
-	currentIdx := 0
+	todoOpen := false
+	nextLine := 0
 	for i := range comments {
-		if idx := strings.Index(comments[i].data, token); idx > 0 {
-			idx += len(token)
-			td := NewTodos()
-			td.lines = append(td.lines, comments[i].data[idx:])
-			td.position = path + ":" + strconv.Itoa(comments[i].line)
-			result = append(result, td)
-			currentIdx = len(result) - 1
-			nextLine = true
-			prevLine = comments[i].line
+		if idx := strings.Index(comments[i].data, token); idx > -1 {
+			idx += len(token) // игнорируем сам токен
+			result = append(result, NewTodos(comments[i].data[idx:],
+				path+":"+strconv.Itoa(comments[i].line)))
+			todoOpen = true
+			nextLine = comments[i].line + 1
 			continue
 		}
-		if nextLine && prevLine+1 != comments[i].line {
-			nextLine = false
+		if nextLine != comments[i].line || len(comments[i].data) == 0 {
+			todoOpen = false
+			nextLine = 0
 			continue
 		}
-		if nextLine && len(comments[i].data) > 0 {
-			result[currentIdx].lines = append(result[currentIdx].lines,
-				comments[i].data)
-			prevLine = comments[i].line
-		}
-		if len(comments[i].data) == 0 {
-			nextLine = false
+		if todoOpen && len(comments[i].data) > 0 {
+			lastTodoIdx := len(result) - 1
+			result[lastTodoIdx].AppendLine(comments[i].data)
+			nextLine = comments[i].line + 1
 		}
 	}
 	return result
@@ -243,13 +265,17 @@ func main() {
 		fileslist[prjlist[i]] = list
 	}
 
-	for _, fn := range fileslist {
-		for f := range fn {
-			comments, err := FindComments(fsd, fn[f], CommentSimbols{"//", "/*", "*/"})
+	for _, prjfiles := range fileslist {
+		for filename := range prjfiles {
+			comments, err := FindComments(fsd, prjfiles[filename],
+				CommentSimbols{"//", "/*", "*/"})
 			if err != nil {
 				fmt.Println(err)
 			}
-			todos := FindTodos(baseDir+fn[f], comments, "TODO:")
+			fmt.Println(prjfiles[filename])
+			fmt.Println("--------------------")
+			fmt.Println(comments)
+			todos := FindTodos(baseDir+prjfiles[filename], comments, "TODO:")
 			for i := range todos {
 				fmt.Println(todos[i])
 			}

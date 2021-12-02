@@ -136,14 +136,12 @@ func Test_Comments(t *testing.T) {
 	}
 
 	want := []CommentLine{
-		{line: 1, data: ""},
 		{line: 2, data: " TODO: in hello"},
-		{line: 3, data: " Line two"},
-		{line: 4, data: ""},
+		{line: 4, data: " Line two"},
 		{line: 6, data: " in func line"},
-		{line: 9, data: ""},
-		{line: 10, data: "* Line three"},
-		{line: 11, data: "* Line four"}}
+		{line: 9, data: "/* Line three"},
+		{line: 10, data: "* Line four"},
+		{line: 13, data: "\ta := \"/* in string"}}
 
 	if guardLenght(t, header, len(want), len(got)) {
 		t.Fatal(got)
